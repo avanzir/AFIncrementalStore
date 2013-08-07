@@ -48,6 +48,9 @@ static NSString * const kAFIncrementalStoreLastModifiedAttributeName = @"__af_la
 
 static NSString * const kAFReferenceObjectPrefix = @"__af_";
 
+// Roberto ADD
+static NSString * const kAFIncrementalStoreAlignedAttributeName = @"__af_aligned";
+
 inline NSString * AFReferenceObjectFromResourceIdentifier(NSString *resourceIdentifier) {
     if (!resourceIdentifier) {
         return nil;
@@ -97,6 +100,32 @@ static inline void AFSaveManagedObjectContextOrThrowInternalConsistencyException
 - (void)af_setResourceIdentifier:(NSString *)resourceIdentifier {
     objc_setAssociatedObject(self, &kAFResourceIdentifierObjectKey, resourceIdentifier, OBJC_ASSOCIATION_COPY_NONATOMIC);
 }
+
+@end
+
+#pragma mark -
+#pragma mark NSManagedObject+AFIncrementalStorePublic interface
+// Roberto ADD
+@implementation NSManagedObject (AFIncrementalStorePublic)
+@dynamic af_aligned;
+
+
+static char kAlignedAttributeObjectKey;
+
+- (NSString *)af_aligned {
+    
+    NSString *aligned = (NSString *)objc_getAssociatedObject(self, &kAlignedAttributeObjectKey);
+    
+    return aligned;
+}
+
+- (void)af_setAlignedAttribute:(NSNumber *)af_aligned {
+    objc_setAssociatedObject(self, &kAlignedAttributeObjectKey,
+                             af_aligned, OBJC_ASSOCIATION_COPY_NONATOMIC);
+}
+
+
+// Roberto END
 
 @end
 
@@ -361,6 +390,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
         }];
         [backingObject setValue:resourceIdentifier forKey:kAFIncrementalStoreResourceIdentifierAttributeName];
         [backingObject setValue:lastModified forKey:kAFIncrementalStoreLastModifiedAttributeName];
+        [backingObject setValue:@"1" forKey:kAFIncrementalStoreAlignedAttributeName];
         [backingObject setValuesForKeysWithDictionary:attributes];
         
         if (!backingObjectID) {
@@ -435,6 +465,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                         [context performBlockAndWait:^{
                             for (NSManagedObject *childObject in childObjects) {
                                 NSManagedObject *parentObject = [context objectWithID:childObject.objectID];
+                                 parentObject.af_aligned=@"1";
                                 [context refreshObject:parentObject mergeChanges:YES];
                             }
                         }];
@@ -467,6 +498,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                 NSManagedObjectID *objectID = [self objectIDForEntity:fetchRequest.entity withResourceIdentifier:resourceIdentifier];
                 NSManagedObject *object = [context objectWithID:objectID];
                 object.af_resourceIdentifier = resourceIdentifier;
+                object.af_aligned=@"0";
                 [mutableObjects addObject:object];
             }
             
@@ -490,6 +522,39 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
         default:
             return nil;
     }
+}
+
+-(void)saveInsertedObject:(NSManagedObject *)insertedObject
+                inContext:(NSManagedObjectContext *)context {
+    NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
+    NSString *primaryKeyName = [self.HTTPClient localResourceIdentifierForManagedObject:insertedObject];
+    NSString *primaryKeyValue = [insertedObject valueForKey:primaryKeyName];
+    
+    assert(insertedObject.managedObjectContext==context);
+    
+    [backingContext performBlockAndWait:^{
+        // Roberto UPDATE, prendol'identificativo da un nuovo metodo del protocollo AFIncrementalStoreHTTPClient
+        NSManagedObjectID *backingObjectID = [self objectIDForBackingObjectForEntity:[insertedObject entity] withResourceIdentifier:primaryKeyName];
+        __block NSManagedObject *backingObject = nil;
+        if (backingObjectID) {
+            [backingContext performBlockAndWait:^{
+                backingObject = [backingContext existingObjectWithID:backingObjectID error:nil];
+            }];
+        }
+        if (!backingObject) {
+            backingObject = [NSEntityDescription insertNewObjectForEntityForName:insertedObject.entity.name inManagedObjectContext:backingContext];
+            [backingObject.managedObjectContext obtainPermanentIDsForObjects:[NSArray arrayWithObject:backingObject] error:nil];
+        }
+        [backingObject setValue:primaryKeyValue forKey:kAFIncrementalStoreResourceIdentifierAttributeName];
+        [self updateBackingObject:backingObject withAttributeAndRelationshipValuesFromManagedObject:insertedObject];
+        [backingContext save:nil];
+    }];
+    
+    [insertedObject willChangeValueForKey:@"objectID"];
+    [context obtainPermanentIDsForObjects:[NSArray arrayWithObject:insertedObject] error:nil];
+    [insertedObject didChangeValueForKey:@"objectID"];
+    
+    [context refreshObject:insertedObject mergeChanges:NO];
 }
 
 - (id)executeSaveChangesRequest:(NSSaveChangesRequest *)saveChangesRequest
@@ -545,6 +610,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                         }
 
                         [backingObject setValue:resourceIdentifier forKey:kAFIncrementalStoreResourceIdentifierAttributeName];
+                        [backingObject setValue:@"1" forKey:kAFIncrementalStoreAlignedAttributeName];
                         [self updateBackingObject:backingObject withAttributeAndRelationshipValuesFromManagedObject:insertedObject];
                         [backingContext save:nil];
                     }];
@@ -553,6 +619,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                     [context obtainPermanentIDsForObjects:[NSArray arrayWithObject:insertedObject] error:nil];
                     [insertedObject didChangeValueForKey:@"objectID"];
 
+                    insertedObject.af_aligned=@"1";
                     [context refreshObject:insertedObject mergeChanges:NO];
                 }
             } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
@@ -607,9 +674,10 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                     [backingContext performBlockAndWait:^{
                         NSManagedObject *backingObject = [backingContext existingObjectWithID:backingObjectID error:nil];
                         [self updateBackingObject:backingObject withAttributeAndRelationshipValuesFromManagedObject:updatedObject];
+                        backingObject.af_aligned=@"1";
                         [backingContext save:nil];
                     }];
-
+                    updatedObject.af_aligned=@"1";
                     [context refreshObject:updatedObject mergeChanges:YES];
                 }
             } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
@@ -663,10 +731,20 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
 
 #pragma mark - NSIncrementalStore
 
+#pragma optional methods
++ (id)identifierForNewStoreAtURL:(NSURL *)storeURL {
+    
+    CFUUIDRef UUID = CFUUIDCreate(NULL);
+    NSString *resourceIdentifier = (__bridge_transfer NSString *)CFUUIDCreateString(NULL, UUID);
+    CFRelease(UUID);
+    return resourceIdentifier;
+    
+}
+
 - (BOOL)loadMetadata:(NSError *__autoreleasing *)error {
     if (!_backingObjectIDByObjectID) {
         NSMutableDictionary *mutableMetadata = [NSMutableDictionary dictionary];
-        [mutableMetadata setValue:[[NSProcessInfo processInfo] globallyUniqueString] forKey:NSStoreUUIDKey];
+        [mutableMetadata setValue:[AFIncrementalStore identifierForNewStoreAtURL:nil] forKey:NSStoreUUIDKey];
         [mutableMetadata setValue:NSStringFromClass([self class]) forKey:NSStoreTypeKey];
         [self setMetadata:mutableMetadata];
         
@@ -690,7 +768,14 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
             [lastModifiedProperty setAttributeType:NSStringAttributeType];
             [lastModifiedProperty setIndexed:NO];
             
-            [entity setProperties:[entity.properties arrayByAddingObjectsFromArray:[NSArray arrayWithObjects:resourceIdentifierProperty, lastModifiedProperty, nil]]];
+            // Roberto ADD
+            NSAttributeDescription *alignedProperty = [[NSAttributeDescription alloc] init];
+            [alignedProperty setName:kAFIncrementalStoreAlignedAttributeName];
+            [alignedProperty setAttributeType:NSStringAttributeType];
+            [alignedProperty setIndexed:NO];
+            
+            [entity setProperties:[entity.properties arrayByAddingObjectsFromArray:[NSArray arrayWithObjects:resourceIdentifierProperty, lastModifiedProperty, alignedProperty, nil]]];
+            // Roberto END
         }
         
         _backingPersistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:model];
@@ -755,10 +840,16 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
     [backingContext performBlockAndWait:^{
         results = [backingContext executeFetchRequest:fetchRequest error:error];
     }];
-    
     NSDictionary *attributeValues = [results lastObject] ?: [NSDictionary dictionary];
-    NSIncrementalStoreNode *node = [[NSIncrementalStoreNode alloc] initWithObjectID:objectID withValues:attributeValues version:1];
-    
+#if 0
+    NSIncrementalStoreNode *node = [[NSIncrementalStoreNode alloc] initWithObjectID:objectID withValues:attributeValues version:CFAbsoluteTimeGetCurrent()];
+#else
+    NSNumber * version=[attributeValues objectForKey:@"version"];
+    int64_t versionNumber=([version isKindOfClass:[NSNull class]])?1:[version intValue];
+    NSIncrementalStoreNode *node = [[NSIncrementalStoreNode alloc] initWithObjectID:objectID withValues:attributeValues
+                                                                            version:versionNumber];
+#endif
+
     if ([self.HTTPClient respondsToSelector:@selector(shouldFetchRemoteAttributeValuesForObjectWithID:inManagedObjectContext:)] && [self.HTTPClient shouldFetchRemoteAttributeValuesForObjectWithID:objectID inManagedObjectContext:context]) {
         if (attributeValues) {
             NSManagedObjectContext *childContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];

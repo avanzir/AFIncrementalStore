@@ -102,6 +102,14 @@
                     withContext:(NSManagedObjectContext *)context
                           error:(NSError *__autoreleasing *)error;
 
+
+
+@end
+
+#pragma mark -
+#pragma mark NSManagedObject+AFIncrementalStorePublic interface
+@interface NSManagedObject (AFIncrementalStorePublic)
+@property (readwrite, nonatomic, copy, setter = af_setAlignedAttribute:) NSString *af_aligned;
 @end
 
 #pragma mark -
@@ -218,6 +226,14 @@
                        pathForRelationship:(NSRelationshipDescription *)relationship
                            forObjectWithID:(NSManagedObjectID *)objectID
                                withContext:(NSManagedObjectContext *)context;
+
+
+/**
+ Roberto UPDATE
+ Restituisce un local identifier univoco generato per l'oggetto rappresentato
+ Nella nostra implementazione di NSIncrementaStore è un metodo @required
+ */
+- (NSString *)localResourceIdentifierForManagedObject:(NSManagedObject *)object;
 
 @optional
 
@@ -400,3 +416,9 @@ extern NSString * const AFIncrementalStoreFaultingRelationshipKey;
  A key in the `userInfo` dictionary in a `AFIncrementalStoreContextWillFetchRemoteValues` or `AFIncrementalStoreContextDidFetchRemoteValues` notification.
  The corresponding value is an `NSPersistentStoreRequest` object representing the associated fetch or save request. */
 extern NSString * const AFIncrementalStorePersistentStoreRequestKey;
+
+
+/**
+ A key in the `userInfo` dictionary in a `AFIncrementalStoreContextWillFetchRemoteValues` or `AFIncrementalStoreContextDidFetchRemoteValues` notification.
+ The corresponding value is an `NSError` object representing the associated error result of fetch or save request. */
+extern NSString * const AFIncrementalStoreFetchSaveRequestErrorKey;
