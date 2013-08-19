@@ -85,6 +85,11 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
 
 #pragma mark Read Methods
 
+- (NSString *)localResourceIdentifierForManagedObject:(NSManagedObject *)object {
+    @throw([NSException exceptionWithName:AFIncrementalStoreUnimplementedMethodException reason:NSLocalizedString(@"Unimplemented method: -localResourceIdentifierForManagedObject:. Must be overridden in a subclass", nil) userInfo:nil]);
+    
+}
+
 - (id)representationOrArrayOfRepresentationsOfEntity:(NSEntityDescription *)entity
                                   fromResponseObject:(id)responseObject
 {

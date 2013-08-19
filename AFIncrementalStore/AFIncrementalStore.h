@@ -66,6 +66,8 @@
  */
 @property (readonly) NSPersistentStoreCoordinator *backingPersistentStoreCoordinator;
 
+@property (readonly) NSManagedObjectContext *backingManagedObjectContext;
+
 ///-----------------------
 /// @name Required Methods
 ///-----------------------
@@ -87,7 +89,6 @@
 ///-----------------------
 /// @name Optional Methods
 ///-----------------------
-
 /**
  
  */
@@ -103,16 +104,15 @@
                           error:(NSError *__autoreleasing *)error;
 
 
+-(void)saveInsertedObject:(NSManagedObject *)insertedObject
+                inContext:(NSManagedObjectContext *)context;
+
 
 @end
 
-#pragma mark -
-#pragma mark NSManagedObject+AFIncrementalStorePublic interface
 @interface NSManagedObject (AFIncrementalStorePublic)
 @property (readwrite, nonatomic, copy, setter = af_setAlignedAttribute:) NSString *af_aligned;
 @end
-
-#pragma mark -
 
 /**
  The `AFIncrementalStoreHTTPClient` protocol defines the methods used by the HTTP client to interract with the associated web services of an `AFIncrementalStore`.
@@ -181,6 +181,8 @@
                                      ofEntity:(NSEntityDescription *)entity
                                  fromResponse:(NSHTTPURLResponse *)response;
 
+
+
 /**
  Returns a URL request object for the specified fetch request within a particular managed object context.
  
@@ -227,12 +229,11 @@
                            forObjectWithID:(NSManagedObjectID *)objectID
                                withContext:(NSManagedObjectContext *)context;
 
-
 /**
  Roberto UPDATE
  Restituisce un local identifier univoco generato per l'oggetto rappresentato
  Nella nostra implementazione di NSIncrementaStore è un metodo @required
- */
+*/
 - (NSString *)localResourceIdentifierForManagedObject:(NSManagedObject *)object;
 
 @optional
@@ -417,8 +418,7 @@ extern NSString * const AFIncrementalStoreFaultingRelationshipKey;
  The corresponding value is an `NSPersistentStoreRequest` object representing the associated fetch or save request. */
 extern NSString * const AFIncrementalStorePersistentStoreRequestKey;
 
-
 /**
  A key in the `userInfo` dictionary in a `AFIncrementalStoreContextWillFetchRemoteValues` or `AFIncrementalStoreContextDidFetchRemoteValues` notification.
- The corresponding value is an `NSError` object representing the associated error result of fetch or save request. */
+ The corresponding value is an `NSError` object representing the associated result of fetch or save request. */
 extern NSString * const AFIncrementalStoreFetchSaveRequestErrorKey;

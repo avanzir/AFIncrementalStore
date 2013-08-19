@@ -124,3 +124,4 @@
 @interface AFBlockPaginator : NSObject <AFPaginator>
 + (instancetype)paginatorWithBlock:(NSDictionary * (^)(NSFetchRequest *fetchRequest))block;
 @end
+
