@@ -107,6 +107,7 @@
 -(void)saveInsertedObject:(NSManagedObject *)insertedObject
                 inContext:(NSManagedObjectContext *)context;
 
+-(void)postPonedSaveChangeRequest:(NSNotification *)notification;
 
 @end
 
@@ -270,6 +271,12 @@
  */
 - (NSMutableURLRequest *)requestForDeletedObject:(NSManagedObject *)deletedObject;
 
+
+/* Roberto ADD */
+-(void)beginIncrementalStoreTransaction;
+-(void)endIncrementalStoreTransaction;
+/* Roberto END */
+
 /**
  Returns whether the client should fetch remote attribute values for a particular managed object. This method is consulted when a managed object faults on an attribute, and will call `-requestWithMethod:pathForObjectWithID:withContext:` if `YES`.
  
@@ -422,3 +429,8 @@ extern NSString * const AFIncrementalStorePersistentStoreRequestKey;
  A key in the `userInfo` dictionary in a `AFIncrementalStoreContextWillFetchRemoteValues` or `AFIncrementalStoreContextDidFetchRemoteValues` notification.
  The corresponding value is an `NSError` object representing the associated result of fetch or save request. */
 extern NSString * const AFIncrementalStoreFetchSaveRequestErrorKey;
+
+// Roberto ADD
+
+/* a key for NSSaveChangeRequest postponed modification */
+extern NSString * const AFIncrementalStoreSaveChangePostPoneRequestKey;
